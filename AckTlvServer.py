@@ -7,9 +7,12 @@ from enum import Enum, unique
 import asyncio
 import asyncio.transports as transports
 
+magic_word = 0xFEEDF00D
+magic_word_len = 4
 
 @unique
 class AckTlvTypeList(Enum):
+
     # Structural
     DataPackage = 0x01
     Info = 0x02
@@ -104,7 +107,7 @@ AckTlvDecodeCallbackList = {
     AckTlvTypeList.ValueDerive.value: lambda array: struct.unpack('!q', array)[0],
     AckTlvTypeList.ValueAbsolute.value: lambda array: struct.unpack('!Q', array)[0],
     AckTlvTypeList.Instance.value: lambda array: array.decode('ASCII'),
-    AckTlvTypeList.Time.value: lambda array: datetime.utcfromtimestamp(struct.unpack('!l', array)[0]),
+    AckTlvTypeList.Time.value: lambda array: datetime.utcfromtimestamp(struct.unpack('!q', array)[0]),
     AckTlvTypeList.ProductId.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.ProtocolVersion.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.HT_CAPAB.value: lambda array: struct.unpack('!q', array)[0],
@@ -143,7 +146,11 @@ class Tlv:
         self.length = struct.unpack('!H', array[1:3])[0]
         if self.type in AckTlvLeaves.keys():
             if self.length > 3:
-                self.value = AckTlvDecodeCallbackList[self.type](array[3:self.length])
+                try:
+                    self.value = AckTlvDecodeCallbackList[self.type](array[3:self.length])
+                except Exception as e:
+                    self.value = None
+                    print(e)
             else:
                 self.value = None
             return self
@@ -193,12 +200,18 @@ class AckTlvServerProtocol(asyncio.Protocol):
     def data_received(self, data: bytes) -> None:
         # print('====Raw data====')
         # print(''.join(["0x%02X " % int(x) for x in data]))
-        tlv = Tlv(0).decode(data)
-        print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-        tlv.dbg_print()
-        print('====Data end====')
-        print('Array length: %d, decode length: %d' % (len(data), len(tlv)))
-        print('================\n\n')
+        if int.from_bytes(data[0:4], byteorder="big") != magic_word:
+            print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            print('====Data check error, abandon!====')
+        else:
+            tlv = Tlv(0).decode(data[magic_word_len:])
+            print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            tlv.dbg_print()
+            print('====Data end====')
+            print('Array length: %d, decode length: %d' % (len(data), len(tlv) + magic_word_len))
+            print('================\n\n')
+            if len(data) != len(tlv) + magic_word_len:
+                print('====Array not fully decoded, there\'s an error somewhere====')
 
 
 def run_server():
