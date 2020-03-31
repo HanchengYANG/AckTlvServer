@@ -7,46 +7,46 @@ from enum import Enum, unique
 import asyncio
 import asyncio.transports as transports
 
-magic_word = 0xFEEDF00D
-magic_word_len = 4
-
 @unique
 class AckTlvTypeList(Enum):
 
     # Structural
-    DataPackage = 0x01
-    Info = 0x02
-    ScanResult = 0x03
-    GPS = 0x04
-    Satellites = 0x05
-    DilutionOfPrecision = 0x06
-    # Leaves
-    ValueCounter = 0x80
-    ValueGauge = 0x81
-    ValueDerive = 0x82
-    ValueAbsolute = 0x83
+    DataPackage = 0xE0
+    Info = 0xE1
+    ScanResult = 0xE2
+    GPS = 0xE3
+    Satellites = 0xE4
+    DilutionOfPrecision = 0xE5
 
-    Instance = 0x84
-    Time = 0x85
-    ProductId = 0x86
-    ProtocolVersion = 0x87
+    # Primitives
+    ValueCounter = 0xC0
+    ValueGauge = 0xC1
+    ValueDerive = 0xC2
+    ValueAbsolute = 0xC3
 
-    HT_CAPAB = 0x90
-    HT_PARAM = 0x91
-    VHT_CAPAB = 0x92
-    VHT_CHWIDTH = 0x93
-    FREQ = 0x94
-    BEACON_INT = 0x95
-    CAPS = 0x96
-    QUAL = 0x97
-    NOISE = 0x98
-    LEVEL = 0x99
-    EST_THROUGHPUT = 0x9A
-    SNR = 0x9B
-    ROAMING_STATUS = 0x9C
+    Instance = 0xC4
+    Time = 0xC5
+    ProductId = 0xC6
+    ProtocolVersion = 0xC7
 
-    Longitude = 0xA0
-    Latitude = 0xA1
+    HT_CAPAB = 0xC8
+    HT_PARAM = 0xC9
+    VHT_CAPAB = 0xCA
+    VHT_CHWIDTH = 0xCB
+    FREQ = 0xCC
+    BEACON_INT = 0xCD
+    CAPS = 0xCE
+    QUAL = 0xCF
+    NOISE = 0xD0
+    LEVEL = 0xD1
+    EST_THROUGHPUT = 0xD2
+    SNR = 0xD3
+    ROAMING_STATUS = 0xD4
+    SSID = 0xD5
+    IF_NAME = 0xD6
+
+    Longitude = 0xD7
+    Latitude = 0xD8
 
 
 # Acksys structural TLV description
@@ -81,6 +81,8 @@ AckTlvLeaves = {
     AckTlvTypeList.EST_THROUGHPUT.value: "Estimated throughput in kbps",
     AckTlvTypeList.SNR.value: "Signal-to-noise ratio in dB",
     AckTlvTypeList.ROAMING_STATUS.value: "Roaming status",
+    AckTlvTypeList.SSID.value: "SSID",
+    AckTlvTypeList.IF_NAME.value: "Interface name",
     AckTlvTypeList.Longitude.value: "Longitude",
     AckTlvTypeList.Latitude.value: "Latitude",
 }
@@ -123,6 +125,8 @@ AckTlvDecodeCallbackList = {
     AckTlvTypeList.EST_THROUGHPUT.value: lambda array: struct.unpack('!q', array)[0],
     AckTlvTypeList.SNR.value: lambda array: struct.unpack('!q', array)[0],
     AckTlvTypeList.ROAMING_STATUS.value: handle_roaming_status,
+    AckTlvTypeList.SSID.value: lambda array: array.decode('ASCII'),
+    AckTlvTypeList.IF_NAME.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.Longitude.value: lambda array: struct.unpack('!d', array)[0],
     AckTlvTypeList.Latitude.value: lambda array: struct.unpack('!d', array)[0],
 }
@@ -143,11 +147,11 @@ class Tlv:
             return None
         # Common part
         self.type = int(array[0])
-        self.length = struct.unpack('!H', array[1:3])[0]
+        self.length = struct.unpack('!H', array[2:4])[0]
         if self.type in AckTlvLeaves.keys():
-            if self.length > 3:
+            if self.length > 0:
                 try:
-                    self.value = AckTlvDecodeCallbackList[self.type](array[3:self.length])
+                    self.value = AckTlvDecodeCallbackList[self.type](array[4:self.length + 4])
                 except Exception as e:
                     self.value = None
                     print(e)
@@ -156,9 +160,9 @@ class Tlv:
             return self
         elif self.type in AckTlvStruct.keys():
             self.value = list()
-            array = array[3:]
+            array = array[4:]
             while len(array) > 0:
-                sub_len = struct.unpack('!H', array[1:3])[0]
+                sub_len = struct.unpack('!H', array[2:4])[0] + 4
                 self.value.append(Tlv(self.iter_counter + 1,
                                       last_in_list=(len(array[sub_len:]) == 0)).decode(array[:sub_len]))
                 array = array[sub_len:]
@@ -184,12 +188,12 @@ class Tlv:
     def __len__(self):
         if self.type in AckTlvLeaves.keys():
             # directly got value
-            return self.length
+            return self.length + 4
         elif self.type in AckTlvStruct.keys():
             s = 0
             for i in self.value:
                 s = s + len(i)
-            return s + 3
+            return s + 4
 
 
 class AckTlvServerProtocol(asyncio.Protocol):
@@ -200,18 +204,14 @@ class AckTlvServerProtocol(asyncio.Protocol):
     def data_received(self, data: bytes) -> None:
         # print('====Raw data====')
         # print(''.join(["0x%02X " % int(x) for x in data]))
-        if int.from_bytes(data[0:4], byteorder="big") != magic_word:
-            print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            print('====Data check error, abandon!====')
-        else:
-            tlv = Tlv(0).decode(data[magic_word_len:])
-            print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-            tlv.dbg_print()
-            print('====Data end====')
-            print('Array length: %d, decode length: %d' % (len(data), len(tlv) + magic_word_len))
-            print('================\n\n')
-            if len(data) != len(tlv) + magic_word_len:
-                print('====Array not fully decoded, there\'s an error somewhere====')
+        tlv = Tlv(0).decode(data)
+        print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        tlv.dbg_print()
+        print('====Data end====')
+        print('Array length: %d, decode length: %d' % (len(data), len(tlv)))
+        print('================\n\n')
+        if len(data) != len(tlv):
+            print('====Array not fully decoded, there\'s an error somewhere====')
 
 
 def run_server():
