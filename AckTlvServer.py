@@ -7,46 +7,47 @@ from enum import Enum, unique
 import asyncio
 import asyncio.transports as transports
 
+
 @unique
 class AckTlvTypeList(Enum):
 
     # Structural
-    DataPackage = 0xE0
-    Info = 0xE1
-    ScanResult = 0xE2
-    GPS = 0xE3
-    Satellites = 0xE4
-    DilutionOfPrecision = 0xE5
+    DataPackage = 0xFFC08000
+    Info = 0xFFC08001
+    ScanResult = 0xFFC08002
+    GPS = 0xFFC08003
+    Satellites = 0xFFC08004
+    DilutionOfPrecision = 0xFFC08005
 
     # Primitives
-    ValueCounter = 0xC0
-    ValueGauge = 0xC1
-    ValueDerive = 0xC2
-    ValueAbsolute = 0xC3
+    ValueCounter = 0xDFC08000
+    ValueGauge = 0xDFC08001
+    ValueDerive = 0xDFC08002
+    ValueAbsolute = 0xDFC08003
 
-    Instance = 0xC4
-    Time = 0xC5
-    ProductId = 0xC6
-    ProtocolVersion = 0xC7
+    Instance = 0xDFC08004
+    Time = 0xDFC08005
+    ProductId = 0xDFC08006
+    ProtocolVersion = 0xDFC08007
 
-    HT_CAPAB = 0xC8
-    HT_PARAM = 0xC9
-    VHT_CAPAB = 0xCA
-    VHT_CHWIDTH = 0xCB
-    FREQ = 0xCC
-    BEACON_INT = 0xCD
-    CAPS = 0xCE
-    QUAL = 0xCF
-    NOISE = 0xD0
-    LEVEL = 0xD1
-    EST_THROUGHPUT = 0xD2
-    SNR = 0xD3
-    ROAMING_STATUS = 0xD4
-    SSID = 0xD5
-    IF_NAME = 0xD6
+    HT_CAPAB = 0xDFC08008
+    HT_PARAM = 0xDFC08009
+    VHT_CAPAB = 0xDFC0800A
+    VHT_CHWIDTH = 0xDFC0800B
+    FREQ = 0xDFC0800C
+    BEACON_INT = 0xDFC0800D
+    CAPS = 0xDFC0800E
+    QUAL = 0xDFC0800F
+    NOISE = 0xDFC08010
+    LEVEL = 0xDFC08011
+    EST_THROUGHPUT = 0xDFC08012
+    SNR = 0xDFC08013
+    ROAMING_STATUS = 0xDFC08014
+    SSID = 0xDFC08015
+    IF_NAME = 0xDFC08016
 
-    Longitude = 0xD7
-    Latitude = 0xD8
+    Longitude = 0xDFC08017
+    Latitude = 0xDFC08018
 
 
 # Acksys structural TLV description
@@ -146,12 +147,12 @@ class Tlv:
         if len(array) == 0:
             return None
         # Common part
-        self.type = int(array[0])
-        self.length = struct.unpack('!H', array[2:4])[0]
+        self.type = struct.unpack('!I', array[0:4])[0]
+        self.length = struct.unpack('!H', array[5:7])[0]
         if self.type in AckTlvLeaves.keys():
             if self.length > 0:
                 try:
-                    self.value = AckTlvDecodeCallbackList[self.type](array[4:self.length + 4])
+                    self.value = AckTlvDecodeCallbackList[self.type](array[7:self.length + 7])
                 except Exception as e:
                     self.value = None
                     print(e)
@@ -160,9 +161,9 @@ class Tlv:
             return self
         elif self.type in AckTlvStruct.keys():
             self.value = list()
-            array = array[4:]
+            array = array[7:self.length + 7]
             while len(array) > 0:
-                sub_len = struct.unpack('!H', array[2:4])[0] + 4
+                sub_len = struct.unpack('!H', array[5:7])[0] + 7
                 self.value.append(Tlv(self.iter_counter + 1,
                                       last_in_list=(len(array[sub_len:]) == 0)).decode(array[:sub_len]))
                 array = array[sub_len:]
@@ -188,12 +189,12 @@ class Tlv:
     def __len__(self):
         if self.type in AckTlvLeaves.keys():
             # directly got value
-            return self.length + 4
+            return self.length + 7
         elif self.type in AckTlvStruct.keys():
             s = 0
             for i in self.value:
                 s = s + len(i)
-            return s + 4
+            return s + 7
 
 
 class AckTlvServerProtocol(asyncio.Protocol):
