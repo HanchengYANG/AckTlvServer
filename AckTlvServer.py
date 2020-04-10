@@ -18,6 +18,8 @@ class AckTlvTypeList(Enum):
     GPS = 0xFFC08003
     Satellites = 0xFFC08004
     DilutionOfPrecision = 0xFFC08005
+    WirelessInfo = 0xFFC08006
+    WirelessAssocListEntry = 0xFFC08007
 
     # Primitives
     ValueCounter = 0xDFC08000
@@ -49,6 +51,19 @@ class AckTlvTypeList(Enum):
     Longitude = 0xDFC08017
     Latitude = 0xDFC08018
 
+    BSSID = 0xDFC08019
+    WirelessMode = 0xDFC0801A
+    WirelessChannel = 0xDFC0801B
+    WirelessSecuMode = 0xDFC0801C
+    WirelessNbClient = 0xDFC0801D
+    RssiPercent = 0xDFC0801E
+    WirelessConnState = 0xDFC0801F
+    WirelessSignal = 0xDFC08020
+
+    PhyLabel = 0xDFC08021
+    PhyName = 0xDFC08022
+    MacAddr = 0xDFC08023
+
 
 # Acksys structural TLV description
 AckTlvStruct = {
@@ -58,6 +73,8 @@ AckTlvStruct = {
     AckTlvTypeList.GPS.value: "GPS",
     AckTlvTypeList.Satellites.value: "Satellites",
     AckTlvTypeList.DilutionOfPrecision.value: "Dilution of precision",
+    AckTlvTypeList.WirelessInfo.value: "Wireless info",
+    AckTlvTypeList.WirelessAssocListEntry.value: "Wireless association list entry",
 }
 
 AckTlvLeaves = {
@@ -86,6 +103,17 @@ AckTlvLeaves = {
     AckTlvTypeList.IF_NAME.value: "Interface name",
     AckTlvTypeList.Longitude.value: "Longitude",
     AckTlvTypeList.Latitude.value: "Latitude",
+    AckTlvTypeList.BSSID.value: "BSSID",
+    AckTlvTypeList.WirelessMode.value: "Mode",
+    AckTlvTypeList.WirelessChannel.value: "Channel",
+    AckTlvTypeList.WirelessSecuMode.value: "Security",
+    AckTlvTypeList.WirelessNbClient.value: "Number of client",
+    AckTlvTypeList.RssiPercent.value: "RSSI in percentage",
+    AckTlvTypeList.WirelessConnState.value: "Connection state",
+    AckTlvTypeList.WirelessSignal.value: "Signal",
+    AckTlvTypeList.PhyLabel.value: "Phy label",
+    AckTlvTypeList.PhyName.value: "Phy name",
+    AckTlvTypeList.MacAddr.value: "MAC addr",
 }
 
 
@@ -102,6 +130,40 @@ def handle_roaming_status(array: bytearray):
         8: 'Roaming stat: select 5',
     }
     return rs_stat_dict.get(value, "Unknown stat: %d" % value)
+
+
+def handle_wireless_mode(array: bytearray):
+    value = struct.unpack('!q', array)[0]
+    d = {
+        1: 'infra-client',
+        2: 'access-point',
+        3: 'ad-hoc',
+        6: 'ieee80211s',
+        7: 'repeater',
+        8: 'isolating-access-point',
+    }
+    return d.get(value, "Unknown stat: %d" % value)
+
+
+def handle_wireless_secu_mode(array: bytearray):
+    value = struct.unpack('!q', array)[0]
+    d = {
+        1: 'none',
+        2: 'wep',
+        3: 'wpa-wpa2-psk',
+        4: 'wpa-wpa2',
+        5: 'sae',
+    }
+    return d.get(value, "Unknown stat: %d" % value)
+
+
+def handle_wireless_conn_state(array: bytearray):
+    value = struct.unpack('!q', array)[0]
+    d = {
+        0: 'not connected',
+        9: 'connected',
+    }
+    return d.get(value, "Unknown stat: %d" % value)
 
 
 AckTlvDecodeCallbackList = {
@@ -130,6 +192,17 @@ AckTlvDecodeCallbackList = {
     AckTlvTypeList.IF_NAME.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.Longitude.value: lambda array: struct.unpack('!d', array)[0],
     AckTlvTypeList.Latitude.value: lambda array: struct.unpack('!d', array)[0],
+    AckTlvTypeList.BSSID.value: lambda array: array.decode('ASCII'),
+    AckTlvTypeList.WirelessMode.value: handle_wireless_mode,
+    AckTlvTypeList.WirelessChannel.value: lambda array: struct.unpack('!i', array[-4:])[0],
+    AckTlvTypeList.WirelessSecuMode.value: handle_wireless_secu_mode,
+    AckTlvTypeList.WirelessNbClient.value: lambda array: struct.unpack('!q', array)[0],
+    AckTlvTypeList.RssiPercent.value: lambda array: struct.unpack('!q', array)[0],
+    AckTlvTypeList.WirelessConnState.value: handle_wireless_conn_state,
+    AckTlvTypeList.WirelessSignal.value: lambda array: struct.unpack('!i', array[-4:])[0],
+    AckTlvTypeList.PhyLabel.value: lambda array: array.decode('ASCII'),
+    AckTlvTypeList.PhyName.value: lambda array: array.decode('ASCII'),
+    AckTlvTypeList.MacAddr.value: lambda array: array.decode('ASCII'),
 }
 
 
@@ -203,8 +276,8 @@ class AckTlvServerProtocol(asyncio.Protocol):
         print('Connection from {}'.format(peername))
 
     def data_received(self, data: bytes) -> None:
-        # print('====Raw data====')
-        # print(''.join(["0x%02X " % int(x) for x in data]))
+        print('====Raw data====')
+        print(''.join(["%02X" % int(x) for x in data]))
         tlv = Tlv(0).decode(data)
         print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         tlv.dbg_print()
