@@ -121,13 +121,13 @@ def handle_roaming_status(array: bytearray):
     value = struct.unpack('!q', array)[0]
     rs_stat_dict = {
         1: 'Best',
-        2: 'Current',
-        3: 'Roaming stat: select 0',
-        4: 'Roaming stat: select 1',
-        5: 'Roaming stat: select 2',
-        6: 'Roaming stat: select 3',
-        7: 'Roaming stat: select 4',
-        8: 'Roaming stat: select 5',
+        2: 'Current active',
+        3: 'Not qualified',
+        4: 'Candidate',
+        5: 'Signal below minimum',
+        6: 'Signal beyond maximum',
+        7: 'Recently connected',
+        8: 'Current passive',
     }
     return rs_stat_dict.get(value, "Unknown stat: %d" % value)
 
@@ -276,8 +276,8 @@ class AckTlvServerProtocol(asyncio.Protocol):
         print('Connection from {}'.format(peername))
 
     def data_received(self, data: bytes) -> None:
-        print('====Raw data====')
-        print(''.join(["%02X" % int(x) for x in data]))
+        # print('====Raw data====')
+        # print(''.join(["%02X" % int(x) for x in data]))
         tlv = Tlv(0).decode(data)
         print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         tlv.dbg_print()
