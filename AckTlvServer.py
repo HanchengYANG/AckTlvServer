@@ -7,6 +7,7 @@ from enum import Enum, unique
 import asyncio
 import asyncio.transports as transports
 
+PROTO = "UDP"
 
 @unique
 class AckTlvTypeList(Enum):
@@ -288,12 +289,34 @@ class AckTlvServerProtocol(asyncio.Protocol):
             print('====Array not fully decoded, there\'s an error somewhere====')
 
 
+class AckTlvServerUDP:
+    def connection_made(self, _transport):
+        self.transport = _transport
+
+    def datagram_received(self, data, addr):
+        tlv = Tlv(0).decode(data)
+        print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+        tlv.dbg_print()
+        print('====Data end====')
+        print('Array length: %d, decode length: %d' % (len(data), len(tlv)))
+        print('================\n\n')
+        if len(data) != len(tlv):
+            print('====Array not fully decoded, there\'s an error somewhere====')
+
+
 def run_server():
     loop = asyncio.get_event_loop()
-    coro = loop.create_server(AckTlvServerProtocol, '10.0.0.1', 8628)
-    server = loop.run_until_complete(coro)
+    coro = None
+    if PROTO == 'TCP':
+        coro = loop.create_server(AckTlvServerProtocol, '10.0.0.1', 8628)
+    if PROTO == 'UDP':
+        coro = loop.create_datagram_endpoint(AckTlvServerUDP, local_addr=('10.0.0.1', 8628))
+    if coro:
+        server = loop.run_until_complete(coro)
+    else:
+        print("Protocol error!\n")
 
-    print('Serving on {}'.format(server.sockets[0].getsockname()))
+    print('Server started\n')
     try:
         loop.run_forever()
     except KeyboardInterrupt:
