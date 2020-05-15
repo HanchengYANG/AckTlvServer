@@ -7,7 +7,9 @@ from enum import Enum, unique
 import asyncio
 import asyncio.transports as transports
 
-PROTO = "UDP"
+PROTO = "TCP"
+SERVER_ADDR = "192.168.175.1"
+SERVER_PORT = 8628
 
 @unique
 class AckTlvTypeList(Enum):
@@ -17,8 +19,6 @@ class AckTlvTypeList(Enum):
     Info = 0xFFC08001
     ScanResult = 0xFFC08002
     GPS = 0xFFC08003
-    Satellites = 0xFFC08004
-    DilutionOfPrecision = 0xFFC08005
     WirelessInfo = 0xFFC08006
     WirelessAssocListEntry = 0xFFC08007
 
@@ -51,6 +51,10 @@ class AckTlvTypeList(Enum):
 
     Longitude = 0xDFC08017
     Latitude = 0xDFC08018
+    ACKTLV_PRI_GPS_HDOP = 0xDFC08024
+    ACKTLV_PRI_GPS_VDOP = 0xDFC08025
+    ACKTLV_PRI_GPS_SAT_U = 0xDFC08026
+    ACKTLV_PRI_GPS_SAT_V = 0xDFC08027
 
     BSSID = 0xDFC08019
     WirelessMode = 0xDFC0801A
@@ -72,8 +76,6 @@ AckTlvStruct = {
     AckTlvTypeList.Info.value: "TLV info",
     AckTlvTypeList.ScanResult.value: "Wifi scan result",
     AckTlvTypeList.GPS.value: "GPS",
-    AckTlvTypeList.Satellites.value: "Satellites",
-    AckTlvTypeList.DilutionOfPrecision.value: "Dilution of precision",
     AckTlvTypeList.WirelessInfo.value: "Wireless info",
     AckTlvTypeList.WirelessAssocListEntry.value: "Wireless association list entry",
 }
@@ -83,10 +85,12 @@ AckTlvLeaves = {
     AckTlvTypeList.ValueGauge.value: "Value",
     AckTlvTypeList.ValueDerive.value: "Value",
     AckTlvTypeList.ValueAbsolute.value: "Value",
+
     AckTlvTypeList.Instance.value: "Instance",
     AckTlvTypeList.Time.value: "Time",
     AckTlvTypeList.ProductId.value: "Product ID",
     AckTlvTypeList.ProtocolVersion.value: "Protocol version",
+
     AckTlvTypeList.HT_CAPAB.value: "HT capabilities",
     AckTlvTypeList.HT_PARAM.value: "5 octets of HT Operation Information",
     AckTlvTypeList.VHT_CAPAB.value: "VHT capabilities",
@@ -102,8 +106,14 @@ AckTlvLeaves = {
     AckTlvTypeList.ROAMING_STATUS.value: "Roaming status",
     AckTlvTypeList.SSID.value: "SSID",
     AckTlvTypeList.IF_NAME.value: "Interface name",
+
     AckTlvTypeList.Longitude.value: "Longitude",
     AckTlvTypeList.Latitude.value: "Latitude",
+    AckTlvTypeList.ACKTLV_PRI_GPS_HDOP.value: "Horizonal DOP",
+    AckTlvTypeList.ACKTLV_PRI_GPS_VDOP.value: "Vertical DOP",
+    AckTlvTypeList.ACKTLV_PRI_GPS_SAT_U.value: "Used satellites",
+    AckTlvTypeList.ACKTLV_PRI_GPS_SAT_V.value: "Visible satellites",
+
     AckTlvTypeList.BSSID.value: "BSSID",
     AckTlvTypeList.WirelessMode.value: "Mode",
     AckTlvTypeList.WirelessChannel.value: "Channel",
@@ -119,7 +129,7 @@ AckTlvLeaves = {
 
 
 def handle_roaming_status(array: bytearray):
-    value = struct.unpack('!q', array)[0]
+    value = int.from_bytes(array, byteorder='big', signed=True)
     rs_stat_dict = {
         1: 'Best',
         2: 'Current active',
@@ -134,7 +144,7 @@ def handle_roaming_status(array: bytearray):
 
 
 def handle_wireless_mode(array: bytearray):
-    value = struct.unpack('!q', array)[0]
+    value = int.from_bytes(array, byteorder='big', signed=True)
     d = {
         1: 'infra-client',
         2: 'access-point',
@@ -147,7 +157,7 @@ def handle_wireless_mode(array: bytearray):
 
 
 def handle_wireless_secu_mode(array: bytearray):
-    value = struct.unpack('!q', array)[0]
+    value = int.from_bytes(array, byteorder='big', signed=True)
     d = {
         1: 'none',
         2: 'wep',
@@ -159,7 +169,7 @@ def handle_wireless_secu_mode(array: bytearray):
 
 
 def handle_wireless_conn_state(array: bytearray):
-    value = struct.unpack('!q', array)[0]
+    value = int.from_bytes(array, byteorder='big', signed=True)
     d = {
         0: 'not connected',
         9: 'connected',
@@ -168,39 +178,47 @@ def handle_wireless_conn_state(array: bytearray):
 
 
 AckTlvDecodeCallbackList = {
-    AckTlvTypeList.ValueCounter.value: lambda array: struct.unpack('!Q', array)[0],
+    AckTlvTypeList.ValueCounter.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
     AckTlvTypeList.ValueGauge.value: lambda array: struct.unpack('!d', array)[0],
-    AckTlvTypeList.ValueDerive.value: lambda array: struct.unpack('!q', array)[0],
-    AckTlvTypeList.ValueAbsolute.value: lambda array: struct.unpack('!Q', array)[0],
+    AckTlvTypeList.ValueDerive.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+    AckTlvTypeList.ValueAbsolute.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+
     AckTlvTypeList.Instance.value: lambda array: array.decode('ASCII'),
-    AckTlvTypeList.Time.value: lambda array: datetime.utcfromtimestamp(struct.unpack('!q', array)[0]),
+    AckTlvTypeList.Time.value: lambda array: datetime.utcfromtimestamp(int.from_bytes(array, byteorder='big', signed=True)),
     AckTlvTypeList.ProductId.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.ProtocolVersion.value: lambda array: array.decode('ASCII'),
-    AckTlvTypeList.HT_CAPAB.value: lambda array: struct.unpack('!q', array)[0],
-    AckTlvTypeList.HT_PARAM.value: lambda array: struct.unpack('!q', array)[0],
-    AckTlvTypeList.VHT_CAPAB.value: lambda array: struct.unpack('!q', array)[0],
-    AckTlvTypeList.VHT_CHWIDTH.value: lambda array: struct.unpack('!q', array)[0],
-    AckTlvTypeList.FREQ.value: lambda array: struct.unpack('!q', array)[0],
-    AckTlvTypeList.BEACON_INT.value: lambda array: struct.unpack('!q', array)[0],
-    AckTlvTypeList.CAPS.value: lambda array: struct.unpack('!q', array)[0],
-    AckTlvTypeList.QUAL.value: lambda array: struct.unpack('!q', array)[0],
-    AckTlvTypeList.NOISE.value: lambda array: struct.unpack('!q', array)[0],
-    AckTlvTypeList.LEVEL.value: lambda array: struct.unpack('!q', array)[0],
-    AckTlvTypeList.EST_THROUGHPUT.value: lambda array: struct.unpack('!q', array)[0],
-    AckTlvTypeList.SNR.value: lambda array: struct.unpack('!q', array)[0],
+
+    AckTlvTypeList.HT_CAPAB.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+    AckTlvTypeList.HT_PARAM.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+    AckTlvTypeList.VHT_CAPAB.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+    AckTlvTypeList.VHT_CHWIDTH.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+    AckTlvTypeList.FREQ.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+    AckTlvTypeList.BEACON_INT.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+    AckTlvTypeList.CAPS.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+    AckTlvTypeList.QUAL.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+    AckTlvTypeList.NOISE.value: lambda array: int.from_bytes(array, byteorder='big', signed=True),
+    AckTlvTypeList.LEVEL.value: lambda array: int.from_bytes(array, byteorder='big', signed=True),
+    AckTlvTypeList.EST_THROUGHPUT.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+    AckTlvTypeList.SNR.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
     AckTlvTypeList.ROAMING_STATUS.value: handle_roaming_status,
     AckTlvTypeList.SSID.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.IF_NAME.value: lambda array: array.decode('ASCII'),
+
     AckTlvTypeList.Longitude.value: lambda array: struct.unpack('!d', array)[0],
     AckTlvTypeList.Latitude.value: lambda array: struct.unpack('!d', array)[0],
+    AckTlvTypeList.ACKTLV_PRI_GPS_HDOP.value: lambda array: struct.unpack('!d', array)[0],
+    AckTlvTypeList.ACKTLV_PRI_GPS_VDOP.value: lambda array: struct.unpack('!d', array)[0],
+    AckTlvTypeList.ACKTLV_PRI_GPS_SAT_U.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+    AckTlvTypeList.ACKTLV_PRI_GPS_SAT_V.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+
     AckTlvTypeList.BSSID.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.WirelessMode.value: handle_wireless_mode,
-    AckTlvTypeList.WirelessChannel.value: lambda array: struct.unpack('!i', array[-4:])[0],
+    AckTlvTypeList.WirelessChannel.value: lambda array: int.from_bytes(array, byteorder='big', signed=True),
     AckTlvTypeList.WirelessSecuMode.value: handle_wireless_secu_mode,
-    AckTlvTypeList.WirelessNbClient.value: lambda array: struct.unpack('!q', array)[0],
-    AckTlvTypeList.RssiPercent.value: lambda array: struct.unpack('!q', array)[0],
+    AckTlvTypeList.WirelessNbClient.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+    AckTlvTypeList.RssiPercent.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
     AckTlvTypeList.WirelessConnState.value: handle_wireless_conn_state,
-    AckTlvTypeList.WirelessSignal.value: lambda array: struct.unpack('!i', array[-4:])[0],
+    AckTlvTypeList.WirelessSignal.value: lambda array: int.from_bytes(array, byteorder='big', signed=True),
     AckTlvTypeList.PhyLabel.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.PhyName.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.MacAddr.value: lambda array: array.decode('ASCII'),
@@ -289,7 +307,7 @@ class AckTlvServerProtocol(asyncio.Protocol):
             print('====Array not fully decoded, there\'s an error somewhere====')
 
 
-class AckTlvServerUDP:
+class AckTlvServerUDP(asyncio.BaseProtocol):
     def connection_made(self, _transport):
         self.transport = _transport
 
@@ -308,9 +326,9 @@ def run_server():
     loop = asyncio.get_event_loop()
     coro = None
     if PROTO == 'TCP':
-        coro = loop.create_server(AckTlvServerProtocol, '10.0.0.1', 8628)
+        coro = loop.create_server(AckTlvServerProtocol, SERVER_ADDR, SERVER_PORT)
     if PROTO == 'UDP':
-        coro = loop.create_datagram_endpoint(AckTlvServerUDP, local_addr=('10.0.0.1', 8628))
+        coro = loop.create_datagram_endpoint(AckTlvServerUDP, local_addr=(SERVER_ADDR, SERVER_PORT))
     if coro:
         server = loop.run_until_complete(coro)
     else:
