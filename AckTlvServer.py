@@ -7,9 +7,12 @@ from enum import Enum, unique
 import asyncio
 import asyncio.transports as transports
 
-PROTO = "TCP"
+PROTO = "UDP"
 SERVER_ADDR = "192.168.175.1"
 SERVER_PORT = 8628
+DBG_CLI_COLOR = True
+SHOW_RAW_DATA = False
+
 
 @unique
 class AckTlvTypeList(Enum):
@@ -267,13 +270,24 @@ class Tlv:
         padding = '\t┃' * self.iter_counter
         if self.type in AckTlvLeaves.keys():
             if self.last:
-                print(padding + "\t┗━━━\033[92m%-10s\033[0m\t\033[95m%s\033[0m" %
-                      (AckTlvLeaves.get(self.type), str(self.value)))
+                if DBG_CLI_COLOR:
+                    print(padding + "\t┗━━━\033[92m%-10s\033[0m\t\033[95m%s\033[0m : %d bytes" %
+                          (AckTlvLeaves.get(self.type), str(self.value), len(self) - 7))
+                else:
+                    print(padding + "\t┗━━━%-10s\t%s : %d bytes" %
+                          (AckTlvLeaves.get(self.type), str(self.value), len(self) - 7))
             else:
-                print(padding + "\t┣━━━\033[92m%-10s\033[0m\t\033[95m%s\033[0m" %
-                      (AckTlvLeaves.get(self.type), str(self.value)))
+                if DBG_CLI_COLOR:
+                    print(padding + "\t┣━━━\033[92m%-10s\033[0m\t\033[95m%s\033[0m : %d bytes" %
+                          (AckTlvLeaves.get(self.type), str(self.value), len(self) - 7))
+                else:
+                    print(padding + "\t┣━━━%-10s\t%s : %d bytes" %
+                          (AckTlvLeaves.get(self.type), str(self.value), len(self) - 7))
         elif self.type in AckTlvStruct.keys():
-            print(padding + "\t┣━━━\033[93m%s\033[0m" % AckTlvStruct.get(self.type))
+            if DBG_CLI_COLOR:
+                print(padding + "\t┣━━━\033[93m%s\033[0m : %d bytes" % (AckTlvStruct.get(self.type), len(self) - 7))
+            else:
+                print(padding + "\t┣━━━%s : %d bytes" % (AckTlvStruct.get(self.type), len(self) - 7))
             for i in self.value:
                 i.dbg_print()
             print("\t┃" * (self.iter_counter + 1))
@@ -295,8 +309,9 @@ class AckTlvServerProtocol(asyncio.Protocol):
         print('Connection from {}'.format(peername))
 
     def data_received(self, data: bytes) -> None:
-        # print('====Raw data====')
-        # print(''.join(["%02X" % int(x) for x in data]))
+        if SHOW_RAW_DATA:
+            print('====Raw data====')
+            print(''.join(["%02X" % int(x) for x in data]))
         tlv = Tlv(0).decode(data)
         print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         tlv.dbg_print()
@@ -312,6 +327,10 @@ class AckTlvServerUDP(asyncio.BaseProtocol):
         self.transport = _transport
 
     def datagram_received(self, data, addr):
+        print("UDP from: " + str(addr))
+        if SHOW_RAW_DATA:
+            print('====Raw data====')
+            print(''.join(["%02X" % int(x) for x in data]))
         tlv = Tlv(0).decode(data)
         print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         tlv.dbg_print()
