@@ -7,7 +7,7 @@ from enum import Enum, unique
 import asyncio
 import asyncio.transports as transports
 
-PROTO = "UDP"
+PROTO = "TCP"
 SERVER_ADDR = "192.168.175.1"
 SERVER_PORT = 8628
 DBG_CLI_COLOR = True
@@ -58,6 +58,9 @@ class AckTlvTypeList(Enum):
     ACKTLV_PRI_GPS_VDOP = 0xDFC08025
     ACKTLV_PRI_GPS_SAT_U = 0xDFC08026
     ACKTLV_PRI_GPS_SAT_V = 0xDFC08027
+    ACKTLV_PRI_GPS_ALT = 0xDFC08028
+    ACKTLV_PRI_GPS_SPD = 0xDFC08029
+    ACKTLV_PRI_GPS_DIR = 0xDFC0802A
 
     BSSID = 0xDFC08019
     WirelessMode = 0xDFC0801A
@@ -116,6 +119,9 @@ AckTlvLeaves = {
     AckTlvTypeList.ACKTLV_PRI_GPS_VDOP.value: "Vertical DOP",
     AckTlvTypeList.ACKTLV_PRI_GPS_SAT_U.value: "Used satellites",
     AckTlvTypeList.ACKTLV_PRI_GPS_SAT_V.value: "Visible satellites",
+    AckTlvTypeList.ACKTLV_PRI_GPS_ALT.value: "Altitude",
+    AckTlvTypeList.ACKTLV_PRI_GPS_SPD.value: "Speed",
+    AckTlvTypeList.ACKTLV_PRI_GPS_DIR.value: "Direction",
 
     AckTlvTypeList.BSSID.value: "BSSID",
     AckTlvTypeList.WirelessMode.value: "Mode",
@@ -213,6 +219,9 @@ AckTlvDecodeCallbackList = {
     AckTlvTypeList.ACKTLV_PRI_GPS_VDOP.value: lambda array: struct.unpack('!d', array)[0],
     AckTlvTypeList.ACKTLV_PRI_GPS_SAT_U.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
     AckTlvTypeList.ACKTLV_PRI_GPS_SAT_V.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
+    AckTlvTypeList.ACKTLV_PRI_GPS_ALT.value: lambda array: struct.unpack('!d', array)[0],
+    AckTlvTypeList.ACKTLV_PRI_GPS_SPD.value: lambda array: struct.unpack('!d', array)[0],
+    AckTlvTypeList.ACKTLV_PRI_GPS_DIR.value: lambda array: struct.unpack('!d', array)[0],
 
     AckTlvTypeList.BSSID.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.WirelessMode.value: handle_wireless_mode,
