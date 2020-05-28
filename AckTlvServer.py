@@ -35,6 +35,7 @@ class AckTlvTypeList(Enum):
     Time = 0xDFC08005
     ProductId = 0xDFC08006
     ProtocolVersion = 0xDFC08007
+    AcktlvStatus = 0xDFC0802B
 
     HT_CAPAB = 0xDFC08008
     HT_PARAM = 0xDFC08009
@@ -96,6 +97,7 @@ AckTlvLeaves = {
     AckTlvTypeList.Time.value: "Time",
     AckTlvTypeList.ProductId.value: "Product ID",
     AckTlvTypeList.ProtocolVersion.value: "Protocol version",
+    AckTlvTypeList.AcktlvStatus.value: "Acktlv status",
 
     AckTlvTypeList.HT_CAPAB.value: "HT capabilities",
     AckTlvTypeList.HT_PARAM.value: "5 octets of HT Operation Information",
@@ -186,6 +188,17 @@ def handle_wireless_conn_state(array: bytearray):
     return d.get(value, "Unknown stat: %d" % value)
 
 
+def handle_acktlv_status(array: bytearray):
+    value = int.from_bytes(array, byteorder='big', signed=False)
+    d = {
+        0: 'Not initialized',
+        1: 'OK',
+        2: 'Loss of data',
+        3: 'Accumulated data due to connection lost',
+    }
+    return d.get(value, "Unknown stat: %d" % value)
+
+
 AckTlvDecodeCallbackList = {
     AckTlvTypeList.ValueCounter.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
     AckTlvTypeList.ValueGauge.value: lambda array: struct.unpack('!d', array)[0],
@@ -196,6 +209,7 @@ AckTlvDecodeCallbackList = {
     AckTlvTypeList.Time.value: lambda array: datetime.utcfromtimestamp(int.from_bytes(array, byteorder='big', signed=True)),
     AckTlvTypeList.ProductId.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.ProtocolVersion.value: lambda array: array.decode('ASCII'),
+    AckTlvTypeList.AcktlvStatus.value: handle_acktlv_status,
 
     AckTlvTypeList.HT_CAPAB.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
     AckTlvTypeList.HT_PARAM.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
@@ -322,12 +336,12 @@ def data_received_handle(data: bytes) -> None:
         print(''.join(["%02X" % int(x) for x in data]))
     tlv = Tlv(0).decode(data)
     # print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    '''if tlv is not None:
+    if tlv is not None:
         print("====TLV START====")
         tlv.dbg_print()
         print("====TLV END====")
     else:
-        print("TLV decode totally failed")'''
+        print("TLV decode totally failed")
     # print('==================')
     print('Array length: %d, decode length: %d' % (len(data), len(tlv)))
     # print('==================')
