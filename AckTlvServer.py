@@ -11,7 +11,7 @@ PROTO = "TCP"
 SERVER_ADDR = "192.168.175.1"
 SERVER_PORT = 8628
 DBG_CLI_COLOR = True
-SHOW_RAW_DATA = False
+SHOW_RAW_DATA = False 
 
 
 @unique
@@ -321,14 +321,16 @@ def data_received_handle(data: bytes) -> None:
         print('====Raw data====')
         print(''.join(["%02X" % int(x) for x in data]))
     tlv = Tlv(0).decode(data)
-    print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
-    # if tlv is not None:
-    #     tlv.dbg_print()
-    # else:
-    #     print("TLV decode totally failed")
-    print('====Data end====')
+    # print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+    '''if tlv is not None:
+        print("====TLV START====")
+        tlv.dbg_print()
+        print("====TLV END====")
+    else:
+        print("TLV decode totally failed")'''
+    # print('==================')
     print('Array length: %d, decode length: %d' % (len(data), len(tlv)))
-    print('================\n\n')
+    # print('==================')
     if len(data) != len(tlv):
         print('====Array not fully decoded, there\'s an error somewhere====')
 
@@ -340,13 +342,25 @@ class AckTlvServerProtocol(asyncio.Protocol):
         self.last_data = None
 
     def data_received(self, data: bytes) -> None:
+        print("\n****ARRAY RECEIVED, LENGTH %d BYTES****" % len(data))
         if self.last_data is not None:
             print("Concate data!")
             data = self.last_data + data
         length = struct.unpack('!H', data[5:7])[0]
         if length + 7 != len(data):
-            print("Data is not complete, indicated %d bytes, actual %d bytes\n" % (length, len(data)))
-            self.last_data = data
+            while length + 7 < len(data):
+                print("Data longer than expected, indicated %d bytes, actual %d bytes" % (length + 7, len(data)))
+                dp_data = data[:length + 7]
+                data_received_handle(dp_data)
+                data = data[-(len(data) - len(dp_data)):]
+                length = struct.unpack('!H', data[5:7])[0]
+            if length + 7 == len(data):
+                print("Length check passed, decode.")
+                data_received_handle(data)
+                print("Multiple DP in one array, but all DPs is completed.")
+            else:
+                print("Data is not complete, indicated %d bytes, actual %d bytes" % (length + 7, len(data)))
+                self.last_data = data
         else:
             print("Length check passed, decode.")
             self.last_data = None
