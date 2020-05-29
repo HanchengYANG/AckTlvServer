@@ -10,8 +10,8 @@ import asyncio.transports as transports
 PROTO = "TCP"
 SERVER_ADDR = "192.168.175.1"
 SERVER_PORT = 8628
-DBG_CLI_COLOR = True
-SHOW_RAW_DATA = False 
+DBG_CLI_COLOR = False
+SHOW_RAW_DATA = False
 
 
 @unique
@@ -335,16 +335,13 @@ def data_received_handle(data: bytes) -> None:
         print('====Raw data====')
         print(''.join(["%02X" % int(x) for x in data]))
     tlv = Tlv(0).decode(data)
-    # print(datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
     if tlv is not None:
         print("====TLV START====")
         tlv.dbg_print()
         print("====TLV END====")
     else:
         print("TLV decode totally failed")
-    # print('==================')
     print('Array length: %d, decode length: %d' % (len(data), len(tlv)))
-    # print('==================')
     if len(data) != len(tlv):
         print('====Array not fully decoded, there\'s an error somewhere====')
 
