@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python3ven
 # -*- coding: UTF-8 -*-
 
 import struct
@@ -6,13 +6,12 @@ from datetime import datetime
 from enum import Enum, unique
 import asyncio
 import asyncio.transports as transports
+from AckTlvData import *
 
-PROTO = "TCP"
 SERVER_ADDR = "192.168.175.1"
 SERVER_PORT = 8628
-DBG_CLI_COLOR = False
+DBG_CLI_COLOR = True 
 SHOW_RAW_DATA = False
-
 
 @unique
 class AckTlvTypeList(Enum):
@@ -261,7 +260,7 @@ class Tlv:
         self.iter_counter = iter_counter
         self.last = last_in_list
 
-    def decode(self, array):
+    def decode(self, array, product=None):
         if len(array) == 0:
             return None
         # Common part
@@ -283,8 +282,20 @@ class Tlv:
             while len(array) > 0:
                 sub_len = struct.unpack('!H', array[5:7])[0] + 7
                 self.value.append(Tlv(self.iter_counter + 1,
-                                      last_in_list=(len(array[sub_len:]) == 0)).decode(array[:sub_len]))
+                                      last_in_list=(len(array[sub_len:]) == 0)).decode(array[:sub_len], product))
                 array = array[sub_len:]
+            # Special procedure for scan result
+            if self.type == AckTlvTypeList.ScanResult.value:
+                for _tlv in self.value:
+                    if _tlv.type == AckTlvTypeList.Time.value:
+                        dt = _tlv.value
+                    if _tlv.type == AckTlvTypeList.BSSID.value:
+                        mac = _tlv.value
+                    if _tlv.type == AckTlvTypeList.LEVEL.value:
+                        sig = _tlv.value
+                    if _tlv.type == AckTlvTypeList.SSID.value:
+                        ssid = _tlv.value
+                product.add_scan_res(mac, dt, sig)
             return self
         else:
             print("Type not defined: 0x%02X" % self.type)
@@ -330,75 +341,65 @@ class Tlv:
             return s + 7
 
 
-def data_received_handle(data: bytes) -> None:
-    if SHOW_RAW_DATA:
-        print('====Raw data====')
-        print(''.join(["%02X" % int(x) for x in data]))
-    tlv = Tlv(0).decode(data)
-    if tlv is not None:
-        print("====TLV START====")
-        tlv.dbg_print()
-        print("====TLV END====")
-    else:
-        print("TLV decode totally failed")
-    print('Array length: %d, decode length: %d' % (len(data), len(tlv)))
-    if len(data) != len(tlv):
-        print('====Array not fully decoded, there\'s an error somewhere====')
-
-
 class AckTlvServerProtocol(asyncio.Protocol):
+    def __init__(self):
+        super(AckTlvServerProtocol, self).__init__()
+        self.__ip = None
+        self.__rest_array = None
+
     def connection_made(self, transport: transports.BaseTransport) -> None:
         peername = transport.get_extra_info('peername')
+        self.__ip = peername[0]
         print('Connection from {}'.format(peername))
-        self.last_data = None
+        # database operation
+        AckTlvDB.product_online(peername[0], datetime.now())
 
     def data_received(self, data: bytes) -> None:
         print("\n****ARRAY RECEIVED, LENGTH %d BYTES****" % len(data))
-        if self.last_data is not None:
+        if self.__rest_array is not None:
             print("Concate data!")
-            data = self.last_data + data
+            data = self.__rest_array + data
         length = struct.unpack('!H', data[5:7])[0]
         if length + 7 != len(data):
             while length + 7 < len(data):
                 print("Data longer than expected, indicated %d bytes, actual %d bytes" % (length + 7, len(data)))
                 dp_data = data[:length + 7]
-                data_received_handle(dp_data)
+                self.data_received_handle(dp_data)
                 data = data[-(len(data) - len(dp_data)):]
                 length = struct.unpack('!H', data[5:7])[0]
             if length + 7 == len(data):
                 print("Length check passed, decode.")
-                data_received_handle(data)
+                self.data_received_handle(data)
                 print("Multiple DP in one array, but all DPs is completed.")
             else:
                 print("Data is not complete, indicated %d bytes, actual %d bytes" % (length + 7, len(data)))
-                self.last_data = data
+                self.__rest_array = data
         else:
             print("Length check passed, decode.")
-            self.last_data = None
-            data_received_handle(data)
+            self.__rest_array = None
+            self.data_received_handle(data)
 
-
-class AckTlvServerUDP(asyncio.BaseProtocol):
-    def connection_made(self, _transport):
-        self.transport = _transport
-
-    def datagram_received(self, data, addr):
-        print("UDP from: " + str(addr))
-        data_received_handle(data)
+    def data_received_handle(self, data: bytes) -> None:
+        if SHOW_RAW_DATA:
+            print('====Raw data====')
+            print(''.join(["%02X" % int(x) for x in data]))
+        ip = self.__ip
+        tlv = Tlv(0).decode(data, AckTlvDB.get_product(ip))
+        if tlv is not None:
+            print("====TLV START====")
+            tlv.dbg_print()
+            print("====TLV END====")
+        else:
+            print("TLV decode totally failed")
+        print('Array length: %d, decode length: %d' % (len(data), len(tlv)))
+        if len(data) != len(tlv):
+            print('====Array not fully decoded, there\'s an error somewhere====')
 
 
 def run_server():
     loop = asyncio.get_event_loop()
-    coro = None
-    if PROTO == 'TCP':
-        coro = loop.create_server(AckTlvServerProtocol, SERVER_ADDR, SERVER_PORT)
-    if PROTO == 'UDP':
-        coro = loop.create_datagram_endpoint(AckTlvServerUDP, local_addr=(SERVER_ADDR, SERVER_PORT))
-    if coro:
-        server = loop.run_until_complete(coro)
-    else:
-        print("Protocol error!\n")
-
+    coro = loop.create_server(AckTlvServerProtocol, SERVER_ADDR, SERVER_PORT)
+    server = loop.run_until_complete(coro)
     print('Server started\n')
     try:
         loop.run_forever()
