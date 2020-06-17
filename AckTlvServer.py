@@ -411,6 +411,9 @@ def run_server():
     loop.run_until_complete(server.wait_closed())
     loop.close()
 
+    print("Generating scan result graph ...")
+    AckTlvDB.plot()
+
 
 if __name__ == '__main__':
     run_server()

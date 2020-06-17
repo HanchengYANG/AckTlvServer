@@ -2,6 +2,9 @@ import ipaddress
 from datetime import datetime as datetime
 import numpy as np
 import matplotlib.pyplot as plt
+import os
+
+PLOT_LENGTH = 50
 
 
 class AckProduct:
@@ -19,6 +22,13 @@ class AckProduct:
         def plot(self, ax: plt.Axes):
             ax.plot(np.array(self.__time), np.array(self.__sig), label='%s' % self.__mac)
 
+        def rec_size(self):
+            return len(self.__time)
+
+        def rec_clear(self):
+            self.__time = list()
+            self.__sig = list()
+
     def __init__(self, ip_str: str, dt: datetime):
         self.__ip = int(ipaddress.IPv4Address(ip_str))
         self.__aps = dict()
@@ -30,8 +40,12 @@ class AckProduct:
     def add_scan_res(self, mac_addr, dt: datetime, sig: int):
         if mac_addr not in self.__aps.keys():
             self.__aps[mac_addr] = AckProduct.AckAp(mac_addr)
-        self.__aps[mac_addr].add_signal_value(dt, sig)
-        self.plot()
+        ap = self.__aps[mac_addr]
+        ap.add_signal_value(dt, sig)
+        if ap.rec_size() >= PLOT_LENGTH:
+            self.plot()
+            for p in self.__aps.values():
+                p.rec_clear()
 
     def plot(self):
         fig, ax = plt.subplots()
@@ -42,7 +56,10 @@ class AckProduct:
         ax.set_title("Scan result of %s" % str(ipaddress.IPv4Address(self.__ip)))
         ax.set_ylim([-80, 0])
         ax.legend()
-        fig.savefig('./plot.png')
+        folder_path = './plots/%s online at %s' % (str(ipaddress.IPv4Address(self.__ip)).replace('.', '-'),
+                                         self.__ol_dt_l[-1].strftime("%d-%m-%y %H:%M:%S"))
+        os.makedirs(folder_path, exist_ok=True)
+        fig.savefig('%s/plot@%s.png' % (folder_path, datetime.now().strftime("%d-%m-%y %H:%M:%S")), dpi=150)
         plt.close(fig)
 
 
@@ -60,6 +77,10 @@ class AckServerDatabase:
 
     def get_product(self, ip_str: str):
         return self.__prods.get(int(ipaddress.IPv4Address(ip_str)), None)
+
+    def plot(self):
+        for p in self.__prods.values():
+            p.plot()
 
 
 AckTlvDB = AckServerDatabase()
