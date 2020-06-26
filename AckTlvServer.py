@@ -141,14 +141,16 @@ AckTlvLeaves = {
 def handle_roaming_status(array: bytearray):
     value = int.from_bytes(array, byteorder='big', signed=True)
     rs_stat_dict = {
-        1: 'Best',
-        2: 'Current active',
-        3: 'Not qualified',
+        0: 'None',
+        1: 'Active',
+        2: 'Best',
+        3: 'Passive',
         4: 'Candidate',
-        5: 'Signal below minimum',
-        6: 'Signal beyond maximum',
-        7: 'Recently connected',
-        8: 'Current passive',
+        5: 'Recently connected',
+        6: 'Signal too weak',
+        7: 'Signal too strong',
+        8: 'Blacklist',
+        9: 'Not qualified',
     }
     return rs_stat_dict.get(value, "Unknown stat: %d" % value)
 
@@ -328,7 +330,7 @@ class Tlv:
                     i.dbg_print()
                 else:
                     print(padding + "\t Decode failed TLV")
-            print("\t┃" * (self.iter_counter + 1))
+            # print("\t┃" * (self.iter_counter + 1))
 
     def __len__(self):
         if self.type in AckTlvLeaves.keys():
@@ -384,7 +386,11 @@ class AckTlvServerProtocol(asyncio.Protocol):
             print('====Raw data====')
             print(''.join(["%02X" % int(x) for x in data]))
         ip = self.__ip
-        tlv = Tlv(0).decode(data, AckTlvDB.get_product(ip))
+        try:
+            tlv = Tlv(0).decode(data, AckTlvDB.get_product(ip))
+        except Exception:
+            print('====Raw data====')
+            print(''.join(["%02X " % int(x) for x in data]))
         if tlv is not None:
             print("====TLV START====")
             tlv.dbg_print()
