@@ -7,6 +7,7 @@ from enum import Enum, unique
 import asyncio
 import asyncio.transports as transports
 from AckTlvData import *
+import sys
 
 SERVER_ADDR = "192.168.175.1"
 SERVER_PORT = 8628
@@ -438,4 +439,9 @@ def run_server():
 
 
 if __name__ == '__main__':
-    run_server()
+    if len(sys.argv) != 3:
+        print("Parameter error, run command: python AckTlvServer.py [IP address] [Port]")
+    else:
+        SERVER_ADDR = sys.argv[1]
+        SERVER_PORT = int(sys.argv[2])
+        run_server()
