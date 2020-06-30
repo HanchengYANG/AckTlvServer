@@ -55,8 +55,8 @@ class AckProduct:
         ax.set_ylabel("Signal level in dBm")
         ax.set_title("Scan result of %s" % str(ipaddress.IPv4Address(self.__ip)))
         ax.set_ylim([-80, 0])
-        ax.legend()
-        folder_path = './plots/%s online at %s' % (str(ipaddress.IPv4Address(self.__ip)).replace('.', '-'),
+        ax.legend(loc=1, prop={'size': 5})
+        folder_path = '/home/hancheng/TelemetryPlot/ScanResultPlot/%s online at %s' % (str(ipaddress.IPv4Address(self.__ip)).replace('.', '-'),
                                          self.__ol_dt_l[-1].strftime("%d-%m-%y %H:%M:%S"))
         os.makedirs(folder_path, exist_ok=True)
         fig.savefig('%s/plot@%s.png' % (folder_path, datetime.now().strftime("%d-%m-%y %H:%M:%S")), dpi=150)
