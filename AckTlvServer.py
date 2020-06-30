@@ -10,7 +10,7 @@ from AckTlvData import *
 
 SERVER_ADDR = "192.168.175.1"
 SERVER_PORT = 8628
-DBG_CLI_COLOR = True 
+DBG_CLI_COLOR = False
 SHOW_RAW_DATA = False
 
 @unique
