@@ -61,6 +61,7 @@ class AckTlvTypeList(Enum):
     ACKTLV_PRI_GPS_ALT = 0xDFC08028
     ACKTLV_PRI_GPS_SPD = 0xDFC08029
     ACKTLV_PRI_GPS_DIR = 0xDFC0802A
+    ACKTLV_PRO_GPS_STATUS = 0xDFC0802C
 
     BSSID = 0xDFC08019
     WirelessMode = 0xDFC0801A
@@ -123,6 +124,7 @@ AckTlvLeaves = {
     AckTlvTypeList.ACKTLV_PRI_GPS_ALT.value: "Altitude",
     AckTlvTypeList.ACKTLV_PRI_GPS_SPD.value: "Speed",
     AckTlvTypeList.ACKTLV_PRI_GPS_DIR.value: "Direction",
+    AckTlvTypeList.ACKTLV_PRO_GPS_STATUS.value: "GPS status",
 
     AckTlvTypeList.BSSID.value: "BSSID",
     AckTlvTypeList.WirelessMode.value: "Mode",
@@ -147,8 +149,8 @@ def handle_roaming_status(array: bytearray):
         3: 'Passive',
         4: 'Candidate',
         5: 'Recently connected',
-        6: 'Signal too weak',
-        7: 'Signal too strong',
+        6: 'Signal below minimum',
+        7: 'Signal beyond maximum',
         8: 'Blacklist',
         9: 'Not qualified',
     }
@@ -200,6 +202,17 @@ def handle_acktlv_status(array: bytearray):
     return d.get(value, "Unknown stat: %d" % value)
 
 
+def handle_acktlv_gps_status(array: bytearray):
+    value = int.from_bytes(array, byteorder='big', signed=False)
+    d = {
+        0: 'GPS not available',
+        1: 'GPS no fix',
+        2: 'GPS OK',
+        3: 'GPS server error',
+    }
+    return d.get(value, "Unknown stat: %d" % value)
+
+
 AckTlvDecodeCallbackList = {
     AckTlvTypeList.ValueCounter.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
     AckTlvTypeList.ValueGauge.value: lambda array: struct.unpack('!d', array)[0],
@@ -237,6 +250,7 @@ AckTlvDecodeCallbackList = {
     AckTlvTypeList.ACKTLV_PRI_GPS_ALT.value: lambda array: struct.unpack('!d', array)[0],
     AckTlvTypeList.ACKTLV_PRI_GPS_SPD.value: lambda array: struct.unpack('!d', array)[0],
     AckTlvTypeList.ACKTLV_PRI_GPS_DIR.value: lambda array: struct.unpack('!d', array)[0],
+    AckTlvTypeList.ACKTLV_PRO_GPS_STATUS.value: handle_acktlv_gps_status,
 
     AckTlvTypeList.BSSID.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.WirelessMode.value: handle_wireless_mode,
@@ -288,6 +302,7 @@ class Tlv:
                 array = array[sub_len:]
             # Special procedure for scan result
             if self.type == AckTlvTypeList.ScanResult.value:
+                mac, dt, sig, ssid = None, None, None, None
                 for _tlv in self.value:
                     if _tlv.type == AckTlvTypeList.Time.value:
                         dt = _tlv.value
@@ -297,7 +312,7 @@ class Tlv:
                         sig = _tlv.value
                     if _tlv.type == AckTlvTypeList.SSID.value:
                         ssid = _tlv.value
-                product.add_scan_res(mac, dt, sig)
+                product.add_scan_res(mac, dt, sig, ssid)
             return self
         else:
             print("Type not defined: 0x%02X" % self.type)
@@ -382,6 +397,7 @@ class AckTlvServerProtocol(asyncio.Protocol):
             self.data_received_handle(data)
 
     def data_received_handle(self, data: bytes) -> None:
+        tlv = None
         if SHOW_RAW_DATA:
             print('====Raw data====')
             print(''.join(["%02X" % int(x) for x in data]))

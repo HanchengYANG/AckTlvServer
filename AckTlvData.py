@@ -4,23 +4,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
-PLOT_LENGTH = 50
+PLOT_LENGTH = 100
 
 
 class AckProduct:
 
     class AckAp:
-        def __init__(self, mac_addr):
+        def __init__(self, mac_addr, ssid=None):
             self.__mac = mac_addr
             self.__time = list()
             self.__sig = list()
+            if ssid:
+                self.__ssid = ssid
 
         def add_signal_value(self, dt: datetime, sig: int):
             self.__time.append(dt)
             self.__sig.append(sig)
 
         def plot(self, ax: plt.Axes):
-            ax.plot(np.array(self.__time), np.array(self.__sig), label='%s' % self.__mac)
+            if hasattr(self, '_AckAp__ssid'):
+                ax.plot(np.array(self.__time), np.array(self.__sig), label='%s' % self.__ssid)
+            else:
+                ax.plot(np.array(self.__time), np.array(self.__sig), label='%s' % self.__mac)
 
         def rec_size(self):
             return len(self.__time)
@@ -37,9 +42,9 @@ class AckProduct:
     def online(self, dt: datetime):
         self.__ol_dt_l.append(dt)
 
-    def add_scan_res(self, mac_addr, dt: datetime, sig: int):
+    def add_scan_res(self, mac_addr, dt: datetime, sig: int, ssid=None):
         if mac_addr not in self.__aps.keys():
-            self.__aps[mac_addr] = AckProduct.AckAp(mac_addr)
+            self.__aps[mac_addr] = AckProduct.AckAp(mac_addr, ssid=ssid)
         ap = self.__aps[mac_addr]
         ap.add_signal_value(dt, sig)
         if ap.rec_size() >= PLOT_LENGTH:
