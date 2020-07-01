@@ -1,4 +1,4 @@
-#!/usr/bin/python3ven
+#!venv/bin/python3
 # -*- coding: UTF-8 -*-
 
 import struct
@@ -11,7 +11,7 @@ import sys
 
 SERVER_ADDR = "192.168.175.1"
 SERVER_PORT = 8628
-DBG_CLI_COLOR = False
+DBG_CLI_COLOR = True 
 SHOW_RAW_DATA = False
 
 @unique
