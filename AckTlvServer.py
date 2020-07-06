@@ -5,6 +5,8 @@ import struct
 from enum import Enum, unique
 import asyncio
 import asyncio.transports as transports
+from typing import Optional
+
 from AckTlvData import *
 import sys
 
@@ -360,11 +362,12 @@ class Tlv:
             return s + 7
 
 
-class AckTlvServerProtocol(asyncio.Protocol):
-    def __init__(self):
-        super(AckTlvServerProtocol, self).__init__()
+class AckTlvProtocol(asyncio.Protocol):
+    def __init__(self, on_con_lost: asyncio.Future=None):
         self.__ip = None
         self.__rest_array = None
+        if on_con_lost is not None:
+            self.on_con_lost = on_con_lost
 
     def connection_made(self, transport: transports.BaseTransport) -> None:
         peername = transport.get_extra_info('peername')
@@ -419,12 +422,29 @@ class AckTlvServerProtocol(asyncio.Protocol):
         if len(data) != len(tlv):
             print('====Array not fully decoded, there\'s an error somewhere====')
 
+    def connection_lost(self, exc: Optional[Exception]) -> None:
+        print('Connection with {} is lost.'.format(self.__ip))
+        if hasattr(self, 'on_con_lost'):
+            self.on_con_lost.set_result(True)
+
 
 async def run_server():
     loop = asyncio.get_event_loop()
-    server = await loop.create_server(lambda: AckTlvServerProtocol(), SERVER_ADDR, SERVER_PORT)
+    server = await loop.create_server(lambda: AckTlvProtocol(), SERVER_ADDR, SERVER_PORT)
     async with server:
         await server.serve_forever()
+
+
+async def run_client():
+    loop = asyncio.get_event_loop()
+    on_con_lost = loop.create_future()
+    transport, protocol = await loop.create_connection(
+        lambda: AckTlvProtocol(on_con_lost), SERVER_ADDR, SERVER_PORT)
+
+    try:
+        await on_con_lost
+    finally:
+        transport.close()
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:
@@ -432,4 +452,5 @@ if __name__ == '__main__':
     else:
         SERVER_ADDR = sys.argv[1]
         SERVER_PORT = int(sys.argv[2])
-        asyncio.run(run_server())
+        # asyncio.run(run_server())
+        asyncio.run(run_client())
