@@ -90,4 +90,4 @@ class AckServerDatabase:
             p.plot()
 
 
-AckTlvDB = AckServerDatabase()
+AckTlvDB: AckServerDatabase = AckServerDatabase()

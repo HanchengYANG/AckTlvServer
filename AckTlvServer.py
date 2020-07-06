@@ -2,17 +2,17 @@
 # -*- coding: UTF-8 -*-
 
 import struct
-from datetime import datetime
 from enum import Enum, unique
 import asyncio
 import asyncio.transports as transports
 from AckTlvData import *
 import sys
 
-SERVER_ADDR = "192.168.175.1"
+SERVER_ADDR = "0.0.0.0"
 SERVER_PORT = 8628
 DBG_CLI_COLOR = True 
 SHOW_RAW_DATA = False
+
 
 @unique
 class AckTlvTypeList(Enum):
@@ -221,7 +221,8 @@ AckTlvDecodeCallbackList = {
     AckTlvTypeList.ValueAbsolute.value: lambda array: int.from_bytes(array, byteorder='big', signed=False),
 
     AckTlvTypeList.Instance.value: lambda array: array.decode('ASCII'),
-    AckTlvTypeList.Time.value: lambda array: datetime.utcfromtimestamp(int.from_bytes(array, byteorder='big', signed=True)),
+    AckTlvTypeList.Time.value:
+        lambda array: datetime.utcfromtimestamp(int.from_bytes(array, byteorder='big', signed=True)),
     AckTlvTypeList.ProductId.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.ProtocolVersion.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.AcktlvStatus.value: handle_acktlv_status,
@@ -419,24 +420,11 @@ class AckTlvServerProtocol(asyncio.Protocol):
             print('====Array not fully decoded, there\'s an error somewhere====')
 
 
-def run_server():
+async def run_server():
     loop = asyncio.get_event_loop()
-    coro = loop.create_server(AckTlvServerProtocol, SERVER_ADDR, SERVER_PORT)
-    server = loop.run_until_complete(coro)
-    print('Server started\n')
-    try:
-        loop.run_forever()
-    except KeyboardInterrupt:
-        pass
-
-    # Close the server
-    server.close()
-    loop.run_until_complete(server.wait_closed())
-    loop.close()
-
-    print("Generating scan result graph ...")
-    AckTlvDB.plot()
-
+    server = await loop.create_server(lambda: AckTlvServerProtocol(), SERVER_ADDR, SERVER_PORT)
+    async with server:
+        await server.serve_forever()
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:
@@ -444,4 +432,4 @@ if __name__ == '__main__':
     else:
         SERVER_ADDR = sys.argv[1]
         SERVER_PORT = int(sys.argv[2])
-        run_server()
+        asyncio.run(run_server())
