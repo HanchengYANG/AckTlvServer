@@ -448,7 +448,7 @@ async def run_client():
 
 if __name__ == '__main__':
     if len(sys.argv) != 3:
-        print("Parameter error, run command: python AckTlvServer.py [IP address] [Port]")
+        print("Parameter error, run command: python AckTlvConn.py [IP address] [Port]")
     else:
         SERVER_ADDR = sys.argv[1]
         SERVER_PORT = int(sys.argv[2])
