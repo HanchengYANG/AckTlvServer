@@ -12,7 +12,7 @@ import sys
 
 SERVER_ADDR = "0.0.0.0"
 SERVER_PORT = 8628
-DBG_CLI_COLOR = True 
+DBG_CLI_COLOR = False
 SHOW_RAW_DATA = False
 
 
