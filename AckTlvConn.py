@@ -425,7 +425,8 @@ class AckTlvProtocol(asyncio.Protocol):
     def connection_lost(self, exc: Optional[Exception]) -> None:
         print('Connection with {} is lost.'.format(self.__ip))
         if hasattr(self, 'on_con_lost'):
-            self.on_con_lost.set_result(True)
+            if not self.on_con_lost.cancelled():
+                self.on_con_lost.set_result(1)
 
 
 async def run_server():
@@ -453,5 +454,10 @@ if __name__ == '__main__':
         SERVER_ADDR = sys.argv[1]
         SERVER_PORT = int(sys.argv[2])
         # asyncio.run(run_server())
-        asyncio.run(run_client())
-        AckTlvDB.plot()
+        try:
+            asyncio.run(run_client())
+        except KeyboardInterrupt:
+            print("Keyboard interrupt.")
+        finally:
+            print("Generating graph...")
+            AckTlvDB.plot()
