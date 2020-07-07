@@ -454,3 +454,4 @@ if __name__ == '__main__':
         SERVER_PORT = int(sys.argv[2])
         # asyncio.run(run_server())
         asyncio.run(run_client())
+        AckTlvDB.plot()
