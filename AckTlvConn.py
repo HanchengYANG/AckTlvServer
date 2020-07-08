@@ -379,7 +379,7 @@ class AckTlvProtocol(asyncio.Protocol):
     def data_received(self, data: bytes) -> None:
         print("\n****ARRAY RECEIVED, LENGTH %d BYTES****" % len(data))
         if self.__rest_array is not None:
-            print("Concate data!")
+            print("%d bytes not decoded from last TLV, concate data!" % len(self.__rest_array))
             data = self.__rest_array + data
         length = struct.unpack('!H', data[5:7])[0]
         if length + 7 != len(data):
@@ -392,7 +392,8 @@ class AckTlvProtocol(asyncio.Protocol):
             if length + 7 == len(data):
                 print("Length check passed, decode.")
                 self.data_received_handle(data)
-                print("Multiple DP in one array, but all DPs is completed.")
+                self.__rest_array = None
+                print("Multiple DP in array, but all DPs are completed. Memory cleared.")
             else:
                 print("Data is not complete, indicated %d bytes, actual %d bytes" % (length + 7, len(data)))
                 self.__rest_array = data
@@ -400,6 +401,7 @@ class AckTlvProtocol(asyncio.Protocol):
             print("Length check passed, decode.")
             self.__rest_array = None
             self.data_received_handle(data)
+            print("Single DP in array, DP is completed. Memory cleared.")
 
     def data_received_handle(self, data: bytes) -> None:
         tlv = None
