@@ -12,7 +12,7 @@ import sys
 
 SERVER_ADDR = "0.0.0.0"
 SERVER_PORT = 8628
-DBG_CLI_COLOR = False
+DBG_CLI_COLOR = True
 SHOW_RAW_DATA = False
 
 
@@ -26,6 +26,7 @@ class AckTlvTypeList(Enum):
     GPS = 0xFFC08003
     WirelessInfo = 0xFFC08006
     WirelessAssocListEntry = 0xFFC08007
+    WirelessMeshListEntry = 0xFFC08008
 
     # Primitives
     ValueCounter = 0xDFC08000
@@ -79,6 +80,20 @@ class AckTlvTypeList(Enum):
     PhyName = 0xDFC08022
     MacAddr = 0xDFC08023
 
+    WirelessMeshListMetric = 0xDFC0802D
+    WirelessMeshListDiscoveryTimeoout = 0xDFC0802E
+    WirelessMeshListDiscoveryRetries = 0xDFC0802F
+    WirelessMeshListStateActive = 0xDFC08030
+    WirelessMeshListStateResolving = 0xDFC08031
+    WirelessMeshListStateDsnValid = 0xDFC08032
+    WirelessMeshListStateFixed = 0xDFC08033
+    WirelessMeshListStateResolved = 0xDFC08034
+    WirelessMeshListWlanIndex = 0xDFC08035
+    WirelessMeshListDstMac = 0xDFC08036
+    WirelessMeshListNextHopMac = 0xDFC08037
+    WirelessMeshListPhy = 0xDFC08038
+    WirelessMeshListMeshId = 0xDFC08039
+
 
 # Acksys structural TLV description
 AckTlvStruct = {
@@ -88,6 +103,7 @@ AckTlvStruct = {
     AckTlvTypeList.GPS.value: "GPS",
     AckTlvTypeList.WirelessInfo.value: "Wireless info",
     AckTlvTypeList.WirelessAssocListEntry.value: "Wireless association list entry",
+    AckTlvTypeList.WirelessMeshListEntry.value: "Wireless mesh list entry",
 }
 
 AckTlvLeaves = {
@@ -140,6 +156,20 @@ AckTlvLeaves = {
     AckTlvTypeList.PhyLabel.value: "Phy label",
     AckTlvTypeList.PhyName.value: "Phy name",
     AckTlvTypeList.MacAddr.value: "MAC addr",
+
+    AckTlvTypeList.WirelessMeshListMetric.value: "Metric",
+    AckTlvTypeList.WirelessMeshListDiscoveryTimeoout.value: "Discovery Timeoout",
+    AckTlvTypeList.WirelessMeshListDiscoveryRetries.value: "Discovery Retries",
+    AckTlvTypeList.WirelessMeshListStateActive.value: "State Active",
+    AckTlvTypeList.WirelessMeshListStateResolving.value: "State Resolving",
+    AckTlvTypeList.WirelessMeshListStateDsnValid.value: "State Dsn Valid",
+    AckTlvTypeList.WirelessMeshListStateFixed.value: "State Fixed",
+    AckTlvTypeList.WirelessMeshListStateResolved.value: "State Resolved",
+    AckTlvTypeList.WirelessMeshListWlanIndex.value: "Wlan Index",
+    AckTlvTypeList.WirelessMeshListDstMac.value: "Dst Mac",
+    AckTlvTypeList.WirelessMeshListNextHopMac.value: "Next Hop Mac",
+    AckTlvTypeList.WirelessMeshListPhy.value: "Phy",
+    AckTlvTypeList.WirelessMeshListMeshId.value: "Mesh Id",
 }
 
 
@@ -267,6 +297,20 @@ AckTlvDecodeCallbackList = {
     AckTlvTypeList.PhyLabel.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.PhyName.value: lambda array: array.decode('ASCII'),
     AckTlvTypeList.MacAddr.value: lambda array: array.decode('ASCII'),
+
+    AckTlvTypeList.WirelessMeshListMetric.value: lambda array: int.from_bytes(array, byteorder='big', signed=True),
+    AckTlvTypeList.WirelessMeshListDiscoveryTimeoout.value: lambda array: int.from_bytes(array, byteorder='big', signed=True),
+    AckTlvTypeList.WirelessMeshListDiscoveryRetries.value: lambda array: int.from_bytes(array, byteorder='big', signed=True),
+    AckTlvTypeList.WirelessMeshListStateActive.value: lambda array: int.from_bytes(array, byteorder='big', signed=True),
+    AckTlvTypeList.WirelessMeshListStateResolving.value: lambda array: int.from_bytes(array, byteorder='big', signed=True),
+    AckTlvTypeList.WirelessMeshListStateDsnValid.value: lambda array: int.from_bytes(array, byteorder='big', signed=True),
+    AckTlvTypeList.WirelessMeshListStateFixed.value: lambda array: int.from_bytes(array, byteorder='big', signed=True),
+    AckTlvTypeList.WirelessMeshListStateResolved.value: lambda array: int.from_bytes(array, byteorder='big', signed=True),
+    AckTlvTypeList.WirelessMeshListWlanIndex.value: lambda array: int.from_bytes(array, byteorder='big', signed=True),
+    AckTlvTypeList.WirelessMeshListDstMac.value: lambda array: array.decode('ASCII'),
+    AckTlvTypeList.WirelessMeshListNextHopMac.value: lambda array: array.decode('ASCII'),
+    AckTlvTypeList.WirelessMeshListPhy.value: lambda array: array.decode('ASCII'),
+    AckTlvTypeList.WirelessMeshListMeshId.value: lambda array: array.decode('ASCII'),
 }
 
 
